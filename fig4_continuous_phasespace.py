@@ -7,28 +7,42 @@ import matplotlib as mpl
 # ==========================================
 # 0. Formatting
 # ==========================================
+# Updated fonts to differentiate panel titles from axis labels 
 mpl.rcParams.update({
     'font.family': 'sans-serif',
     'font.size': 9,             
-    'axes.titlesize': 10,       
+    'axes.titlesize': 11,
+    'axes.titleweight': 'bold',
     'axes.labelsize': 10,       
     'xtick.labelsize': 8,      
     'ytick.labelsize': 8,      
     'legend.fontsize': 7,
     'lines.linewidth': 1.0,
-    'figure.titlesize': 10
+    'figure.titlesize': 12,
+    'figure.titleweight': 'bold'
 })
 
 # ==========================================
-# 1. Physical Parameters
+# 1. Physical Parameters & Normalization
 # ==========================================
-kBT = 1.0           
-kappa = 1.0         
-gamma = 1.0         
+# Using realistic mesoscopic physical values to demonstrate stability
+kT_phys = 4.11e-21           # J (thermal energy at ~300K)
+kappa_phys = 1e-6            # N/m (trap stiffness)
+gamma_phys = 1e-9            # N s/m (drag coefficient)
+
+# Characteristic scales used to avoid numerical instabilities
+E_c = kT_phys
+x_c = np.sqrt(kT_phys / kappa_phys)
+t_c = gamma_phys / kappa_phys
+
+# Normalized parameters (Internal Working Variables)
+kBT = kT_phys / E_c                                # 1.0
+kappa = kappa_phys / (E_c / x_c**2)                # 1.0
+gamma = gamma_phys / (E_c * t_c / x_c**2)          # 1.0
 
 # Thermodynamic limits for the Thermostat Regime
 c_crit_limit = (kBT**2) / (2 * kappa) 
-v_max_theoretical = np.sqrt((kappa * kBT) / gamma**2)
+v_max_theoretical = np.sqrt((kappa * kBT) / gamma**2) # 1.0 in normalized units
 
 # ==========================================
 # 2. Setup the 2D Phase Space Grid
@@ -130,41 +144,47 @@ else:
 if vmin_safe >= vmax_safe:
     vmin_safe = vmax_safe * 0.1
 
-mesh0 = ax[0].pcolormesh(V_grid, c_grid, Effort_map_masked, shading='auto', cmap='magma', 
+# Plot against scaled v/v_max
+mesh0 = ax[0].pcolormesh(V_grid / v_max_theoretical, c_grid, Effort_map_masked, shading='auto', cmap='magma', 
                          norm=LogNorm(vmin=vmin_safe, vmax=vmax_safe))
 
-ax[0].plot(v_vals[valid_idx], c_crit_curve[valid_idx], color='white', linewidth=1.2, linestyle='--')
+# Plot exact analytical envelope
+ax[0].plot(v_vals[valid_idx] / v_max_theoretical, c_crit_curve[valid_idx], color='white', linewidth=1.2, linestyle='--')
 
-cbar0 = plt.colorbar(mesh0, ax=ax[0])
-cbar0.set_label(r'Precision Effort ($\dot{\Sigma}_{meas} / \Sigma^2$) [Log]')
+cbar0 = plt.colorbar(mesh0, ax=ax[0], extend='max')
+cbar0.set_label(r'Precision Effort ($\dot{\Sigma}_{meas} / \Sigma^2$)')
 cbar0.ax.yaxis.set_label_coords(6.0, 0.5)
 
 ax[0].set_title('Continuous Precision Effort')
 ax[0].set_ylabel('Cost Coefficient ($c$)')
 ax[0].text(0.05, c_crit_limit * 0.05, 'Active Engine', color='black', fontweight='bold')
-ax[0].text(v_max_theoretical * 0.55, c_crit_limit * 0.5, 'Bankrupt', color='white', fontweight='bold')
+ax[0].text(0.55, c_crit_limit * 0.5, 'Bankrupt', color='white', fontweight='bold')
 
 # --- BOTTOM PLOT: Thermodynamic Viability Ratio ---
-mesh1 = ax[1].pcolormesh(V_grid, c_grid, P_ratio, shading='auto', cmap='viridis', 
+# Plot against scaled v/v_max
+mesh1 = ax[1].pcolormesh(V_grid / v_max_theoretical, c_grid, P_ratio, shading='auto', cmap='viridis', 
                          vmin=0, vmax=5.0) 
 
-ax[1].plot(v_vals[valid_idx], c_crit_curve[valid_idx], color='white', linewidth=1.2, linestyle='--')
+# Plot exact analytical envelope
+ax[1].plot(v_vals[valid_idx] / v_max_theoretical, c_crit_curve[valid_idx], color='white', linewidth=1.2, linestyle='--')
 
 cbar1 = plt.colorbar(mesh1, ax=ax[1], extend='max') 
 cbar1.set_label(r'Power Ratio ($\mathcal{P}_{fluct} / \mathcal{P}_{drag}$)')
 cbar1.ax.yaxis.set_label_coords(6.0, 0.5)
 
 ax[1].set_title('Thermodynamic Viability Ratio')
-ax[1].set_xlabel('Macroscopic Velocity ($v$)')
+# Bounded x-axis label as specified in the rebuttal
+ax[1].set_xlabel(r'Macroscopic Velocity ($v/v_{max}$)')
 ax[1].set_ylabel('Cost Coefficient ($c$)')
 
 ax[1].text(0.05, c_crit_limit * 0.05, r'Ratio $\gg 1$', color='black', fontweight='bold')
-ax[1].text(v_max_theoretical * 0.55, c_crit_limit * 0.5, r'Ratio $< 1$', color='white', fontweight='bold')
+ax[1].text(0.55, c_crit_limit * 0.5, r'Ratio $< 1$', color='white', fontweight='bold')
 
 for a in ax:
-    a.set_xlim(0, v_max_theoretical)
+    # Explicitly bound the visible x-axis to exactly v_max
+    a.set_xlim(0, 1.0)
     a.set_ylim(0, c_crit_limit * 1.05)
 
 plt.tight_layout()
-plt.savefig('./Fig4.pdf', dpi=600, bbox_inches='tight')
+plt.savefig('./Fig4.png', dpi=600, bbox_inches='tight')
 #plt.show()
