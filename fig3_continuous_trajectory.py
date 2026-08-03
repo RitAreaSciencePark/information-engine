@@ -13,13 +13,15 @@ np.random.seed(42)
 mpl.rcParams.update({
     'font.family': 'sans-serif',
     'font.size': 9,             
-    'axes.titlesize': 10,        
+    'axes.titlesize': 11,
+    'axes.titleweight': 'bold',
     'axes.labelsize': 10,        
     'xtick.labelsize': 8,       
     'ytick.labelsize': 8,       
     'legend.fontsize': 7,
     'lines.linewidth': 1.0,
-    'figure.titlesize': 10
+    'figure.titlesize': 12,
+    'figure.titleweight': 'bold'
 })
 
 # Physical Parameters
@@ -180,11 +182,16 @@ else:
     vmax = np.max(meas_intensity) * 1.1
 
 norm = plt.Normalize(0, vmax) 
-lc = LineCollection(segments, cmap='viridis', norm=norm, zorder=5, linewidth=1.5)
+
+# Apply high-contrast colormap, thicker line, and top zorder
+lc = LineCollection(segments, cmap='plasma', norm=norm, zorder=10, linewidth=2.5)
 lc.set_array(meas_intensity[:-1])
 ax1.add_collection(lc)
 
 ax1.plot([], [], color='blue', linestyle='--', linewidth=1.2, label=r'Belief Mean ($\mu$)')
+
+# Render terminal trap position
+ax1.scatter(N_total - 1, lam[-1], color='red', zorder=6, marker='o', s=20)
 
 divider = make_axes_locatable(ax1)
 cax = divider.append_axes("right", size="3%", pad=0.05) 
@@ -194,15 +201,17 @@ formatter = ticker.ScalarFormatter(useMathText=True)
 formatter.set_powerlimits((-2, 2)) 
 cbar.ax.yaxis.set_major_formatter(formatter)
 
+# Force rendering to access the offset text, then explicitly pin it to the left
 plt.draw() 
 offset_text = cbar.ax.yaxis.get_offset_text()
-offset_text.set_horizontalalignment('center')
-offset_text.set_x(4.0)
+offset_text.set_fontsize(8)
+offset_text.set_horizontalalignment('left')
+offset_text.set_x(0.0)
 
 cbar.set_label(r'Sensor Precision ($L_t$)', rotation=90, labelpad=10)
 
 ax1.set_ylabel("Position")
-ax1.set_title('Maxwell Demon with Continuous Sensor')
+ax1.set_title('Maxwell Demon with Continuous Sensor', pad=15)
 ax1.legend(loc='lower center', framealpha=0.9, handlelength=1.5, labelspacing=0.3, borderpad=0.3)
 ax1.grid(True, color='lightgray', alpha=0.5, linewidth=0.5)
 
@@ -231,5 +240,5 @@ ax2.legend(loc='lower left', ncol=2, framealpha=0.9, handlelength=1.5)
 ax2.grid(True, color='lightgray', alpha=0.5, linewidth=0.5)
 
 plt.tight_layout()
-plt.savefig('./Fig3.pdf', dpi=600, bbox_inches='tight')
+plt.savefig('./Fig3.png', dpi=600, bbox_inches='tight')
 #plt.show()
