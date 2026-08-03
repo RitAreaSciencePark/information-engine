@@ -9,40 +9,68 @@ from scipy.optimize import brentq
 mpl.rcParams.update({
     'font.family': 'sans-serif', 
     'font.size': 9,             
-    'axes.titlesize': 10,
+    'axes.titlesize': 11,
+    'axes.titleweight': 'bold',
     'axes.labelsize': 10,
     'xtick.labelsize': 8,
     'ytick.labelsize': 8,
     'legend.fontsize': 7,       
     'lines.linewidth': 1.0,     
-    'figure.titlesize': 10
+    'figure.titlesize': 12,
+    'figure.titleweight': 'bold'
 })
 
 # ==========================================
-# 1. Physics & Thermodynamics Parameters
+# 1. Physical Parameters (Mesoscopic Scales)
 # ==========================================
-kT = 1.0
-kappa = 1.0
-gamma = 1.0
-dt = 0.01 
-t_f = int(20 / dt)
-lambda_f = 1.0
+# Using realistic mesoscopic physical values to demonstrate stability
+kT_phys = 4.11e-21           # J (thermal energy at ~300K)
+kappa_phys = 1e-6            # N/m (trap stiffness)
+gamma_phys = 1e-9            # N s/m (drag coefficient)
+
+# Timescales and lengths
+tau_relax = gamma_phys / kappa_phys
+x_eq = np.sqrt(kT_phys / kappa_phys)
+
+dt_phys = 0.01 * tau_relax 
+t_f_phys = 20.0 * tau_relax
+lambda_f_phys = 1.0 * x_eq
+
+C_crit_phys = 0.5 * kT_phys 
 fraction_of_C_crit = 0.6
+C_phys = C_crit_phys * fraction_of_C_crit      
 
-# Reset variance. 
-sigma_min = 0.00000000
+sigma_min_phys = 0.0
 
-# System constants
+# ==========================================
+# 2. Normalization to Dimensionless Scales
+# ==========================================
+# Characteristic scales used to avoid numerical instabilities
+E_c = kT_phys
+x_c = np.sqrt(kT_phys / kappa_phys)
+t_c = gamma_phys / kappa_phys
+
+# Normalized parameters (Internal Working Variables)
+kT = kT_phys / E_c                                # 1.0
+kappa = kappa_phys / (E_c / x_c**2)               # 1.0
+gamma = gamma_phys / (E_c * t_c / x_c**2)         # 1.0
+
+dt = dt_phys / t_c
+t_f = int(np.round(t_f_phys / dt_phys))
+lambda_f = lambda_f_phys / x_c
+C = C_phys / E_c
+sigma_min = sigma_min_phys / x_c**2
+
+# System constants (Normalized)
 alpha = np.exp(-kappa * dt / gamma)
 alpha_bar = 1.0 - alpha
-sigma_eq = (kT / kappa) * (1 - alpha**2)
-Sigma_max = (kT / kappa)
 
-C_crit = 0.5 * kT 
-C = C_crit * fraction_of_C_crit      
+# Rebuttal notation updates: Sigma_eq -> Sigma_delta, Sigma_max -> Sigma_kappa
+sigma_delta = (kT / kappa) * (1 - alpha**2)
+sigma_kappa = (kT / kappa)
 
 # ==========================================
-# 2. Backward Induction: Precompute Policy 
+# 3. Backward Induction: Precompute Policy 
 # ==========================================
 P = 0.0  # Base case for the final step target
 A_seq = np.zeros(t_f + 1)
@@ -70,14 +98,13 @@ g_funcs = []
 # Base case: At the deadline, informational cost is zero
 g_funcs.append(lambda sigma: 0.0)
 
-# 
 def build_step(A_n, g_prev):
     # The baseline future cost of measuring is constant for this step
-    next_prior_after_meas = sigma_min * (alpha**2) + sigma_eq
+    next_prior_after_meas = sigma_min * (alpha**2) + sigma_delta
     g_min_evolved = g_prev(next_prior_after_meas)
     
     def Q_unmeas(sigma):
-        return g_prev(sigma * (alpha**2) + sigma_eq)
+        return g_prev(sigma * (alpha**2) + sigma_delta)
         
     def Q_meas(sigma):
         return C - A_n * sigma + g_min_evolved
@@ -86,7 +113,7 @@ def build_step(A_n, g_prev):
         return Q_meas(sigma) - Q_unmeas(sigma)
         
     # Search for the root (threshold) up to a safe physical upper bound
-    sigma_upper_bound = (kT / kappa) * 10.0 
+    sigma_upper_bound = sigma_kappa * 10.0 
     
     if diff(0.0) <= 0:
         th = 0.0  # Measure regardless of certainty
@@ -108,7 +135,7 @@ for n in range(1, t_f + 1):
     g_funcs.append(g_new)
 
 # ==========================================
-# 3. Forward Simulation: An Individual Trajectory
+# 4. Forward Simulation: An Individual Trajectory
 # ==========================================
 np.random.seed(42)  # For reproducible fluctuations
 
@@ -120,19 +147,19 @@ lam = np.zeros(t_f + 1)     # Trap position
 measured = np.zeros(t_f, dtype=bool)
 
 # Initial conditions
-x[0] = np.random.normal(0, np.sqrt(Sigma_max))
+x[0] = np.random.normal(0, np.sqrt(sigma_kappa))
 mu[0] = 0.0
-var[0] = Sigma_max  # Assume we start with equilibrium uncertainty
+var[0] = sigma_kappa  # Assume we start with equilibrium uncertainty
 lam_prev = 0.0
 total_work = 0.0
 measure_count = 0
 
-print("Simulating forward trajectory...")
+print("Simulating forward trajectory in normalized scales...")
 
 for t in range(t_f):
     n = t_f - t  # Steps remaining
     
-    # --- PHASE 1: Observe ---
+    # --- PHASE 1: Observe (using discrete branch evaluation) ---
     if var[t] > thresholds[n]:
         measured[t] = True
         measure_count += 1
@@ -155,12 +182,12 @@ for t in range(t_f):
     
     # --- PHASE 3: Evolve (Physics) ---
     # True position evolves via Exact Ornstein-Uhlenbeck update
-    noise = np.random.normal(0, np.sqrt(sigma_eq))
+    noise = np.random.normal(0, np.sqrt(sigma_delta))
     x[t+1] = x[t] * alpha + lam[t] * alpha_bar + noise
     
     # Belief state evolves analytically
     mu[t+1] = mu_plus * alpha + lam[t] * alpha_bar
-    var[t+1] = var_plus * alpha**2 + sigma_eq
+    var[t+1] = var_plus * alpha**2 + sigma_delta
 
 # Snap the final trap position to the target to complete the protocol
 lam[t_f] = lambda_f
@@ -169,10 +196,10 @@ total_work += final_jump_work
 
 print("Simulation Complete.")
 print(f"Total Measurements Taken: {measure_count}")
-print(f"Total Thermodynamic Work Done: {total_work/kT:.4f}")
+print(f"Total Normalized Thermodynamic Work Done: {total_work/kT:.4f}")
 
 # ==========================================
-# 4. Visualization
+# 5. Visualization (Plotted in Normalized Units)
 # ==========================================
 time_steps = np.arange(t_f + 1)
 std_dev = np.sqrt(var)
@@ -191,7 +218,10 @@ meas_times = np.where(measured)[0]
 if len(meas_times) > 0:
     ax1.scatter(meas_times, x[meas_times], color='black', zorder=5, marker='o', s=12, label='Measurement')
 
-ax1.set_ylabel("Position")
+# Render terminal trap position without legend entry
+ax1.scatter(t_f, lam[t_f], color='red', zorder=6, marker='o', s=20)
+
+ax1.set_ylabel("Normalized Position")
 ax1.set_title("Maxwell Demon with Binary Measurements")
 ax1.legend(loc='upper left', framealpha=0.9, handlelength=1.5, labelspacing=0.3, borderpad=0.3)
 ax1.grid(True, alpha=0.3, linewidth=0.5)
@@ -199,16 +229,16 @@ ax1.grid(True, alpha=0.3, linewidth=0.5)
 # --- Bottom Plot: Variance and Thresholds ---
 ax2.plot(time_steps, var, color='purple', linewidth=1.2, label=r'Variance ($\Sigma$)')
 ax2.plot(time_steps[:-1], thresholds[1:][::-1], color='orange', linestyle='--', linewidth=1.2, label=r'Threshold ($\Sigma_{th}$)')
-ax2.axhline((kT / kappa), color='black', linestyle=':', alpha=0.5, linewidth=1.0, label=r'Eq. Limit ($\Sigma_{\kappa}$)')
+ax2.axhline(sigma_kappa, color='black', linestyle=':', alpha=0.5, linewidth=1.0, label=r'Eq. Limit ($\Sigma_{\kappa}$)')
 
 ax2.set_xlabel("Time Step (k)")
-ax2.set_ylabel("Variance")
-ax2.set_ylim(sigma_eq * 0.5, (kT/kappa) * 2.7)
+ax2.set_ylabel("Normalized Variance")
+ax2.set_ylim(sigma_delta * 0.5, sigma_kappa * 2.7)
 ax2.legend(loc='upper left', framealpha=0.95, handlelength=1.5, labelspacing=0.3, borderpad=0.3)
 ax2.grid(True, alpha=0.3, linewidth=0.5)
 
 # Deadline Blindness Shading
-blind_idx = np.where(thresholds[1:][::-1] > 1)[0]
+blind_idx = np.where(thresholds[1:][::-1] > sigma_kappa)[0]
 if len(blind_idx) > 0:
     blind_step = time_steps[blind_idx[0]]
     for ax in [ax1, ax2]:
