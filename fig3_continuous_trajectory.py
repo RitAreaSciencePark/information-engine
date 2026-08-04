@@ -221,7 +221,7 @@ ax2.set_xlim(0, N_total)
 ax2.plot(time_steps, var_plus, color='purple', linewidth=1.2, label=r'Variance ($\Sigma$)')
 ax2.plot(time_steps, true_target_forward, color='darkorange', linestyle='--', linewidth=1.2, label=r'DP Target ($\Sigma_{opt}^+$)')
 
-ax2.axhline(Sigma_max, color='gray', linestyle=':', linewidth=1.0, label=r'Eq. Limit ($\Sigma_{\kappa}$)')
+ax2.axhline(Sigma_max, color='gray', linestyle=':', linewidth=1.0, label=r'Eq. Limit ($\Sigma_{eq}$)')
 ax2.axhline(true_steady_state_target, color='mediumseagreen', linestyle='-.', linewidth=1.2, alpha=0.9, label=r'Asymptote ($\Sigma_\infty^*$)')
 
 blind_idx = np.where(true_target_forward[1:] >= kBT/kappa)[0]
