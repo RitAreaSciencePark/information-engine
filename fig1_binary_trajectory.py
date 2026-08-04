@@ -229,7 +229,7 @@ ax1.grid(True, alpha=0.3, linewidth=0.5)
 # --- Bottom Plot: Variance and Thresholds ---
 ax2.plot(time_steps, var, color='purple', linewidth=1.2, label=r'Variance ($\Sigma$)')
 ax2.plot(time_steps[:-1], thresholds[1:][::-1], color='orange', linestyle='--', linewidth=1.2, label=r'Threshold ($\Sigma_{th}$)')
-ax2.axhline(sigma_kappa, color='black', linestyle=':', alpha=0.5, linewidth=1.0, label=r'Eq. Limit ($\Sigma_{\kappa}$)')
+ax2.axhline(sigma_kappa, color='black', linestyle=':', alpha=0.5, linewidth=1.0, label=r'Eq. Limit ($\Sigma_{eq}$)')
 
 ax2.set_xlabel("Time Step (k)")
 ax2.set_ylabel("Normalized Variance")
